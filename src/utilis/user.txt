@@ -1,0 +1,16 @@
+Step-1: Create a user model
+
+1. username
+2.email
+3.password
+4.profileImage
+5.bio
+6.profession
+7.role
+
+
+Step-2 : Create route for user
+get method: get info from data bash
+post method: post info from clint to data bash
+put method/patch method: update and edit info
+delete method: delete info from data bash
