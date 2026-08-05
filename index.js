@@ -47,7 +47,7 @@ app.use(cookieParser());
 // ======================
 // Upload Image Utility
 // ======================
-const uploadImage = require("./src/utilis/UploadImage");
+const { uploadImage } = require("./src/utilis/uploadImage");
 
 // ======================
 // Routes
