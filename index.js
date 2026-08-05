@@ -19,7 +19,6 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Postman বা Server-to-Server রিকোয়েস্টে origin থাকে না
       if (!origin) return callback(null, true);
 
       const cleanOrigin = origin.replace(/\/$/, "");
@@ -31,7 +30,6 @@ app.use(
         callback(null, true);
       } else {
         console.log("CORS Blocked Origin:", origin);
-        // Error থ্রো না করে সুন্দরভাবে false পাঠানো হলো যাতে Vercel Crash না করে
         callback(null, false);
       }
     },
@@ -39,7 +37,7 @@ app.use(
   })
 );
 
-// Payload limit
+// Payload limit (Base64 ইমেজের জন্য বড় পেলোড দরকার)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -62,7 +60,7 @@ async function connectDB() {
   }
 }
 
-// ⚠️ সব Route-এর আগে DB Connection Check নিশ্চিত করতে হবে
+// সব Route-এর আগে DB Connection Check
 app.use(async (req, res, next) => {
   await connectDB();
   next();
@@ -71,8 +69,8 @@ app.use(async (req, res, next) => {
 // ======================
 // Upload Image Utility
 // ======================
-// ⚠️ আপনার ফোল্ডারের নাম utils নাকি utilis সেটির বানান খেয়াল রাখুন
-const { uploadImage } = require("./src/utilis/uploadImage");
+// ✅ Fix: Destructuring বাদ দিয়ে সরাসরি ইম্পোর্ট করা হয়েছে
+const uploadImage = require("./src/utilis/uploadImage");
 
 // ======================
 // Routes
@@ -86,19 +84,27 @@ app.use("/api/contact", require("./src/contact/contact.route"));
 app.use("/api/blogs", require("./src/blog/blog.route"));
 
 // Upload Image API
-app.post("/uploadImage", async (req, res) => {
+app.post("/uploadImage", async (req, res, next) => {
   try {
-    const imageUrl = await uploadImage(req.body.image);
+    const { image } = req.body;
 
-    res.status(200).json(imageUrl);
+    if (!image) {
+      return res.status(400).json({
+        success: false,
+        message: "No image input provided",
+      });
+    }
+
+    const imageUrl = await uploadImage(image);
+
+    // ফ্রন্টএন্ড সহজে পড়ার জন্য একটি অবজেক্ট আকারে পাঠাতে পারেন
+    res.status(200).json({
+      success: true,
+      url: imageUrl,
+    });
   } catch (error) {
     console.error("Upload Error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Image upload failed",
-      error: error.message,
-    });
+    next(error); // Global Error Handler এ পাঠানো হলো
   }
 });
 
@@ -128,8 +134,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Local Development-এর জন্য
-if (process.env.NODE_ENV !== "production") {
+// Vercel Serverless Function-এর বাইরে পোর্টে রান করানোর ব্যবস্থা
+if (process.env.VERCEL !== "1") {
   connectDB().then(() => {
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
