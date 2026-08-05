@@ -37,9 +37,8 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 };
 
+// ✅ app.use(cors()) একাই GET, POST, PUT, DELETE সহ OPTIONS (Preflight) সামলে নেবে
 app.use(cors(corsOptions));
-// ✅ Fix 1: Pre-flight (OPTIONS) রিকোয়েস্ট নিশ্চিত করতে
-app.options("*", cors(corsOptions));
 
 // Payload limit (Base64 ইমেজের জন্য)
 app.use(express.json({ limit: "50mb" }));
