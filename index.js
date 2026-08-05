@@ -16,28 +16,32 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
 
-      const cleanOrigin = origin.replace(/\/$/, "");
-      const isAllowed = allowedOrigins.some(
-        (o) => o.replace(/\/$/, "") === cleanOrigin
-      );
+    const cleanOrigin = origin.replace(/\/$/, "");
+    const isAllowed = allowedOrigins.some(
+      (o) => o.replace(/\/$/, "") === cleanOrigin
+    );
 
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        console.log("CORS Blocked Origin:", origin);
-        callback(null, false);
-      }
-    },
-    credentials: true,
-  })
-);
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log("CORS Blocked Origin:", origin);
+      callback(new Error("CORS Not Allowed"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
 
-// Payload limit (Base64 ইমেজের জন্য বড় পেলোড দরকার)
+app.use(cors(corsOptions));
+// ✅ Fix 1: Pre-flight (OPTIONS) রিকোয়েস্ট নিশ্চিত করতে
+app.options("*", cors(corsOptions));
+
+// Payload limit (Base64 ইমেজের জন্য)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -69,7 +73,6 @@ app.use(async (req, res, next) => {
 // ======================
 // Upload Image Utility
 // ======================
-// ✅ Fix: Destructuring বাদ দিয়ে সরাসরি ইম্পোর্ট করা হয়েছে
 const uploadImage = require("./src/utilis/uploadImage");
 
 // ======================
@@ -97,14 +100,13 @@ app.post("/uploadImage", async (req, res, next) => {
 
     const imageUrl = await uploadImage(image);
 
-    // ফ্রন্টএন্ড সহজে পড়ার জন্য একটি অবজেক্ট আকারে পাঠাতে পারেন
     res.status(200).json({
       success: true,
       url: imageUrl,
     });
   } catch (error) {
     console.error("Upload Error:", error);
-    next(error); // Global Error Handler এ পাঠানো হলো
+    next(error);
   }
 });
 
