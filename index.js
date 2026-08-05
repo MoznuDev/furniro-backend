@@ -19,7 +19,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Postman বা Server-to-Server রিকোয়েস্টে origin থাকে না
+      // Postman বা Server-to-Server রিকোয়েস্টে origin থাকে না
       if (!origin) return callback(null, true);
 
       const cleanOrigin = origin.replace(/\/$/, "");
@@ -31,7 +31,8 @@ app.use(
         callback(null, true);
       } else {
         console.log("CORS Blocked Origin:", origin);
-        callback(new Error("Not allowed by CORS"));
+        // Error থ্রো না করে সুন্দরভাবে false পাঠানো হলো যাতে Vercel Crash না করে
+        callback(null, false);
       }
     },
     credentials: true,
@@ -45,8 +46,32 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
 
 // ======================
+// Database Connection (Serverless Friendly)
+// ======================
+let isConnected = false;
+
+async function connectDB() {
+  if (isConnected && mongoose.connection.readyState === 1) return;
+
+  try {
+    const db = await mongoose.connect(process.env.DB_URL);
+    isConnected = db.connections[0].readyState === 1;
+    console.log("MongoDB Connected Successfully");
+  } catch (error) {
+    console.error("MongoDB Connection Failed:", error.message);
+  }
+}
+
+// ⚠️ সব Route-এর আগে DB Connection Check নিশ্চিত করতে হবে
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
+
+// ======================
 // Upload Image Utility
 // ======================
+// ⚠️ আপনার ফোল্ডারের নাম utils নাকি utilis সেটির বানান খেয়াল রাখুন
 const { uploadImage } = require("./src/utilis/uploadImage");
 
 // ======================
@@ -103,34 +128,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ======================
-// Database Connection & Server Start
-// ======================
-let isConnected = false;
-
-async function connectDB() {
-  if (isConnected && mongoose.connection.readyState === 1) return;
-
-  try {
-    await mongoose.connect(process.env.DB_URL);
-    isConnected = true;
-    console.log(" MongoDB Connected Successfully");
-  } catch (error) {
-    console.error(" MongoDB Connection Failed:", error.message);
-  }
-}
-
-// প্রতি রিকোয়েস্টে কানেকশন চেক করবে (Serverless / Vercel-এর জন্য)
-app.use(async (req, res, next) => {
-  await connectDB();
-  next();
-});
-
-// Local Development-এর জন্য: আগে DB কানেক্ট হবে, তারপর সার্ভার চালু হবে
+// Local Development-এর জন্য
 if (process.env.NODE_ENV !== "production") {
   connectDB().then(() => {
     app.listen(port, () => {
-      console.log(` Server is running on port ${port}`);
+      console.log(`Server is running on port ${port}`);
     });
   });
 }
