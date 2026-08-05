@@ -1,14 +1,12 @@
 const products = require("./product.model");
 const reviewsModel = require("../reviews/review.model"); 
+// ⚠️ আপনার ফোল্ডার ও ফাইলের আসল স্পেলিং মিলিয়ে নিশ্চিত হয়ে নিন
 const { errorResponse, successResponse } = require("../utilis/responsHandler");
 
-//  Create New Product 
-// Create New Product 
+// ১. Create New Product 
 const createNewProduct = async (req, res) => {
     try {
-        // যদি একসঙ্গে একাধিক প্রোডাক্ট (Bulk Insert) পাঠানো হয়
         if (Array.isArray(req.body)) {
-            // প্রতিটি আইটেমে author আইডি সেট করে দেওয়া ভালো
             const productsWithAuthor = req.body.map(item => ({
                 ...item,
                 author: req.user?._id || req.user?.id || item.author
@@ -17,39 +15,34 @@ const createNewProduct = async (req, res) => {
             return successResponse(res, 201, 'All products created successfully', savedProducts);
         }
 
-        // সিঙ্গেল প্রোডাক্ট তৈরির ক্ষেত্রে verifyToken থেকে আসা req.user আইডি যুক্ত করা
         const newProduct = new products({
             ...req.body,
             author: req.user?._id || req.user?.id || req.body.author
         });
 
         const savedProduct = await newProduct.save();
-
         return successResponse(res, 201, 'Product created successfully', savedProduct);
     } catch (error) {
-        return errorResponse(res, 500, "Failed to create a new product", error.message);
+        console.error("Create Product Error:", error);
+        return errorResponse(res, 500, "Failed to create a new product", error.message || error.toString());
     }
 };
 
-// ২. Get All Products 
+// ২. Get All Products (FIXED)
 const getAllProducts = async (req, res) => {
     try {
         const { category, color, minPrice, maxPrice, search, page = 1, limit = 10 } = req.query;
         const filter = {};
         
-        // (Case-insensitive)
         if (category && category !== 'all') {
             filter.category = { $regex: new RegExp(`^${category}$`, 'i') };
         }
         if (color && color !== 'all') {
             filter.color = { $regex: new RegExp(`^${color}$`, 'i') };
         }
-        
-        
         if (search) {
             filter.name = { $regex: search, $options: 'i' };
         }
-        
         
         if ((minPrice !== undefined && minPrice !== '') || (maxPrice !== undefined && maxPrice !== '')) {
             filter.price = {};
@@ -61,19 +54,16 @@ const getAllProducts = async (req, res) => {
             }
         }
 
-        console.log("Applied MongoDB Filter:", JSON.stringify(filter));
-
-        
         const currentPage = Math.max(1, parseInt(page));
         const limitPerPage = Math.max(1, parseInt(limit));
         const skip = (currentPage - 1) * limitPerPage;
 
-        
+        // Populate Safe করার জন্য try catch wrapping বা নরমাল ফেচ
         const [allProducts, totalProducts] = await Promise.all([
             products.find(filter)
                 .skip(skip)
                 .limit(limitPerPage)
-                .populate('author', 'email username')
+                .populate({ path: 'author', select: 'email username', strictPopulate: false })
                 .sort({ createdAt: -1 }), 
             products.countDocuments(filter)
         ]);
@@ -88,7 +78,10 @@ const getAllProducts = async (req, res) => {
             limitPerPage
         });
     } catch (error) {
-        return errorResponse(res, 500, "Failed to fetch products", error.message);
+        console.error("GetAllProducts Error:", error);
+        // ⚠️ error.message না থাকলেও আসল স্ট্রিং বা অবজেক্ট পাঠাবে
+        const detailedError = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+        return errorResponse(res, 500, "Failed to fetch products", detailedError);
     }
 };
 
@@ -96,21 +89,21 @@ const getAllProducts = async (req, res) => {
 const getSingleProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const product = await products.findById(id).populate('author', "username email");
+        const product = await products.findById(id).populate({ path: 'author', select: 'username email', strictPopulate: false });
         
         if (!product) {
             return errorResponse(res, 404, "Product not found");
         }
 
-        
-        const reviews = await reviewsModel.find({ productId: id }).populate('userId', 'username email');
+        const reviews = await reviewsModel.find({ productId: id }).populate({ path: 'userId', select: 'username email', strictPopulate: false });
         
         return successResponse(res, 200, "Single product and reviews", { 
             product, 
             reviews 
         });
     } catch (error) {
-        return errorResponse(res, 500, "Failed to get single product", error.message);
+        console.error("GetSingleProduct Error:", error);
+        return errorResponse(res, 500, "Failed to get single product", error.message || error.toString());
     }
 };
 
@@ -130,7 +123,8 @@ const updateProductById = async (req, res) => {
 
         return successResponse(res, 200, 'Product updated successfully', updatedProduct);
     } catch (error) {
-        return errorResponse(res, 500, "Failed to update product", error.message);
+        console.error("UpdateProduct Error:", error);
+        return errorResponse(res, 500, "Failed to update product", error.message || error.toString());
     }
 };
 
@@ -144,12 +138,12 @@ const deleteProductById = async (req, res) => {
             return errorResponse(res, 404, 'Product not found');
         }
 
-       
         await reviewsModel.deleteMany({ productId: productId });
         
         return successResponse(res, 200, "Product and its reviews deleted successfully");
     } catch (error) {
-        return errorResponse(res, 500, 'Failed to delete product', error.message);
+        console.error("DeleteProduct Error:", error);
+        return errorResponse(res, 500, 'Failed to delete product', error.message || error.toString());
     }
 };
 
