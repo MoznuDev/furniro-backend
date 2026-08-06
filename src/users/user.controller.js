@@ -46,7 +46,10 @@ const userLoggedIN = async (req, res) => {
       return errorResponse(res, 401, "Invalid email or password");
     }
 
-    const token = await generateToken(user._id, user.role);
+    const token = generateToken({
+  userId: user._id,
+  role: user.role,
+});
 
     const isProduction = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
