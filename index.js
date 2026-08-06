@@ -12,7 +12,7 @@ const port = process.env.PORT || 5000;
 // ======================
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://furniro-client-3e62.vercel.app",
+  "https://furniro-client-3e62-git-main-moznudevs-projects.vercel.app",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 

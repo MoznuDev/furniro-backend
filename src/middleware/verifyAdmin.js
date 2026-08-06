@@ -1,10 +1,14 @@
-const { errorResponse } = require("../utilis/responsHandler");
-
 const verifyAdmin = (req, res, next) => {
-  // 💡 সতর্কতা: এই মিডলওয়্যারটি রাউটে অবশ্যই verifyToken এর পরে বসাতে হবে
-  if (!req.role || req.role !== 'admin') {
-    return res.status(403).json({ message: "Unauthorized access denied! Admin only." });
+  // 💡 req.role অথবা req.user.role - যেকোনো জায়গা থেকে রোল সংগ্রহ করা
+  const userRole = req.role || req.user?.role;
+
+  if (!userRole || userRole !== 'admin') {
+    return res.status(403).json({ 
+      success: false,
+      message: "Forbidden access! Admin role required." 
+    });
   }
+  
   next();
 };
 

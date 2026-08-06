@@ -13,7 +13,6 @@ const verifyToken = require("../middleware/verifyToken");
 const verifyAdmin = require("../middleware/verifyAdmin");
 
 // ================= USER STATS =================
-// 🛠️ ফিক্স: লগইন করা ইউজার নিজের স্ট্যাটস দেখতে পাবে
 router.get("/user-stats/:email", verifyToken, async (req, res) => {
   const { email } = req.params;
 
@@ -28,6 +27,11 @@ router.get("/user-stats/:email", verifyToken, async (req, res) => {
       return errorResponse(res, 404, "User not found");
     }
 
+    // 🔒 Security Check: ইউজার শুধু তার নিজের স্ট্যাটস দেখতে পারবে (যদি না সে অ্যাডমিন হয়)
+    if (req.role !== "admin" && req.userId !== user._id.toString()) {
+      return errorResponse(res, 403, "Access denied! You can only view your own stats.");
+    }
+
     const totalPaymentsResult = await Order.aggregate([
       { $match: { email } },
       {
@@ -39,7 +43,7 @@ router.get("/user-stats/:email", verifyToken, async (req, res) => {
     ]);
 
     const totalPayments =
-      totalPaymentsResult.length > 0
+      totalPaymentsResult.length > 0 && totalPaymentsResult[0].totalAmount
         ? totalPaymentsResult[0].totalAmount
         : 0;
 
@@ -58,12 +62,11 @@ router.get("/user-stats/:email", verifyToken, async (req, res) => {
       totalPurchasedProducts: purchasedProductsIds.length,
     });
   } catch (error) {
-    return errorResponse(res, 500, "Couldn't get user stats", error);
+    return errorResponse(res, 500, "Couldn't get user stats", error.message);
   }
 });
 
 // ================= ADMIN STATS =================
-// 🛠️ ফিক্স: শুধুমাত্র প্রোটেক্টেড অ্যাডমিনরা ড্যাশবোর্ড স্ট্যাটস দেখতে পাবে
 router.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -84,7 +87,7 @@ router.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
     ]);
 
     const totalEarnings =
-      totalEarningsResult.length > 0
+      totalEarningsResult.length > 0 && totalEarningsResult[0].totalEarnings
         ? totalEarningsResult[0].totalEarnings
         : 0;
 
@@ -110,24 +113,14 @@ router.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
     ]);
 
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
 
     const monthlyEarnings = monthlyEarningsResult.map((entry) => ({
       month: monthNames[entry._id.month - 1],
       year: entry._id.year,
-      earnings: Number(entry.monthlyEarnings.toFixed(2)),
+      earnings: Number((entry.monthlyEarnings || 0).toFixed(2)),
     }));
 
     // Total Products Sold
@@ -144,7 +137,7 @@ router.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
     ]);
 
     const totalProductsSold =
-      totalProductsSoldResult.length > 0
+      totalProductsSoldResult.length > 0 && totalProductsSoldResult[0].totalProductsSold
         ? totalProductsSoldResult[0].totalProductsSold
         : 0;
 
@@ -158,7 +151,7 @@ router.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
       monthlyEarnings,
     });
   } catch (error) {
-    return errorResponse(res, 500, "Couldn't get admin stats", error);
+    return errorResponse(res, 500, "Couldn't get admin stats", error.message);
   }
 });
 

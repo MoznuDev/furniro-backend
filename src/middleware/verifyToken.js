@@ -1,12 +1,16 @@
 const jwt = require('jsonwebtoken');
-const { errorResponse } = require("../utilis/responsHandler"); // বানান খেয়াল রাখুন: utilis নাকি utils
+const { errorResponse } = require("../utilis/responsHandler");
 
-const JWT_SECRET = process.env.JWT_SECRET_KEY || "your_jwt_secret_key"; // 💡 এখানেও ফলব্যাক কী-টি মিল রাখুন
+const JWT_SECRET = process.env.JWT_SECRET_KEY || "your_jwt_secret_key";
 
 const verifyToken = (req, res, next) => {
   try {
-    // আপনি যেহেতু ফ্রন্টএন্ডে credentials: "include" ব্যবহার করছেন, তাই কুকি থেকে টোকেন নেওয়া একদম পারফেক্ট
-    const token = req.cookies.token; 
+    // ১. কুকি থেকে অথবা Authorization Header থেকে টোকেন নিন
+    let token = req.cookies?.token;
+
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    }
 
     if (!token) {
       return errorResponse(res, 401, "Token not found! Please login.");
@@ -18,7 +22,7 @@ const verifyToken = (req, res, next) => {
       return errorResponse(res, 403, "User id not found in token");
     }
 
-    // পরবর্তী মিডলওয়্যার বা কন্ট্রোলারের ব্যবহারের জন্য রিকোয়েস্টে ডাটা সেট করা
+    // মিডলওয়্যার ও কন্ট্রোলারের জন্য ডেটা সেট
     req.userId = decoded.userId;
     req.role = decoded.role;
 
@@ -29,4 +33,3 @@ const verifyToken = (req, res, next) => {
 };
 
 module.exports = verifyToken;
-
