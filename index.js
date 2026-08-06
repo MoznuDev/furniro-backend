@@ -12,24 +12,28 @@ const port = process.env.PORT || 5000;
 // ======================
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://furniro-client-3e62-git-main-moznudevs-projects.vercel.app",
+  "https://furniro-client-ljni.vercel.app",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // Postman/Mobile apps বা Non-browser রিকোয়েস্ট এলাউ করা
     if (!origin) return callback(null, true);
 
     const cleanOrigin = origin.replace(/\/$/, "");
-    const isAllowed = allowedOrigins.some(
-      (o) => o.replace(/\/$/, "") === cleanOrigin
-    );
+    
+    // Check exact or wildcard vercel subdomain matching
+    const isAllowed =
+      allowedOrigins.some((o) => o.replace(/\/$/, "") === cleanOrigin) ||
+      cleanOrigin.endsWith(".vercel.app"); // সব vercel.app সাবডোমেইন এলাউ করার নিরাপদ ট্রিক
 
     if (isAllowed) {
       callback(null, true);
     } else {
       console.log("CORS Blocked Origin:", origin);
-      callback(new Error("CORS Not Allowed"));
+      // ✅ Error থ্রো না করে false পাস করা হলো যাতে সার্ভার ক্র্যাশ না করে প্রপার ৪-০-৩ রেসপন্স পাঠায়
+      callback(null, false);
     }
   },
   credentials: true,
@@ -37,10 +41,9 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 };
 
-// ✅ app.use(cors()) একাই GET, POST, PUT, DELETE সহ OPTIONS (Preflight) সামলে নেবে
 app.use(cors(corsOptions));
 
-// Payload limit (Base64 ইমেজের জন্য)
+// Payload limit
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -65,8 +68,13 @@ async function connectDB() {
 
 // সব Route-এর আগে DB Connection Check
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("Database middleware error:", err);
+    res.status(500).json({ success: false, message: "Database Connection Error" });
+  }
 });
 
 // ======================
@@ -99,13 +107,16 @@ app.post("/uploadImage", async (req, res, next) => {
 
     const imageUrl = await uploadImage(image);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       url: imageUrl,
     });
   } catch (error) {
-    console.error("Upload Error:", error);
-    next(error);
+    console.error("Upload Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload image",
+    });
   }
 });
 
@@ -127,7 +138,7 @@ app.use((req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error("Global Error Log:", err.stack || err.message);
 
   res.status(err.status || 500).json({
     success: false,
