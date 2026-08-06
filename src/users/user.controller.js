@@ -1,8 +1,8 @@
 const User = require("./user.model");
 const generateToken = require("../middleware/generateToken");
 const { successResponse, errorResponse } = require("../utilis/responsHandler");
-const crypto = require("crypto"); // 👈 সিকিউর র্যান্ডম টোকেন তৈরির জন্য
-const nodemailer = require("nodemailer"); // 👈 রিয়েল ইমেইল পাঠানোর জন্য
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 // ১. REGISTER
 const userRegistration = async (req, res) => {
@@ -22,9 +22,8 @@ const userRegistration = async (req, res) => {
     await user.save();
 
     return successResponse(res, 201, "User registered successfully!");
-
   } catch (error) {
-    errorResponse(res, 500, "Registration failed!", error);
+    return errorResponse(res, 500, "Registration failed!", error);
   }
 };
 
@@ -49,10 +48,12 @@ const userLoggedIN = async (req, res) => {
 
     const token = await generateToken(user._id, user.role);
 
+    const isProduction = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return successResponse(res, 200, "Login successful!", {
@@ -63,37 +64,37 @@ const userLoggedIN = async (req, res) => {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
-        bio:user.bio,
+        bio: user.bio,
         profession: user.profession,
       },
     });
-
   } catch (error) {
-    errorResponse(res, 500, "Login failed!", error);
+    return errorResponse(res, 500, "Login failed!", error);
   }
 };
 
 // ৩. LOGOUT
 const userLogout = async (req, res) => {
   try {
+    const isProduction = process.env.NODE_ENV === "production";
     res.clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
     });
-    successResponse(res, 200, "Logged out successfully");
+    return successResponse(res, 200, "Logged out successfully");
   } catch (error) {
-    errorResponse(res, 500, "Logout failed", error);
+    return errorResponse(res, 500, "Logout failed", error);
   }
 };
 
 // ৪. GET ALL USERS
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}, "email role").sort({ createdAt: -1 });
-    successResponse(res, 200, "All users fetched successfully", users);
+    const users = await User.find({}, "email role username profileImage createdAt").sort({ createdAt: -1 });
+    return successResponse(res, 200, "All users fetched successfully", users);
   } catch (error) {
-    errorResponse(res, 500, "Failed to fetch all users!", error);
+    return errorResponse(res, 500, "Failed to fetch all users!", error);
   }
 };
 
@@ -107,7 +108,7 @@ const deleteUser = async (req, res) => {
     }
     return successResponse(res, 200, "User deleted successfully");
   } catch (error) {
-    errorResponse(res, 500, "Failed to delete user!", error);
+    return errorResponse(res, 500, "Failed to delete user!", error);
   }
 };
 
@@ -128,39 +129,32 @@ const updateUserRole = async (req, res) => {
     }
     return successResponse(res, 200, "User role updated successfully", updatedUser);
   } catch (error) {
-    errorResponse(res, 500, "Failed to update user role!", error);
+    return errorResponse(res, 500, "Failed to update user role!", error);
   }
 };
 
 // ৭. EDIT USER PROFILE
 const editUserProfile = async (req, res) => {
   const { id } = req.params;
- 
-
   const { username, profileImage, bio, profession } = req.body;
 
   try {
     const updateFields = { username, profileImage, bio, profession };
-    const updatedUser = await User.findByIdAndUpdate(
-  id,
-  updateFields,
-  {
-    returnDocument: "after", // Mongoose 8+ এর জন্য
-    runValidators: true,
-  }
-);
-
+    const updatedUser = await User.findByIdAndUpdate(id, updateFields, {
+      returnDocument: "after",
+      runValidators: true,
+    });
 
     if (!updatedUser) {
       return errorResponse(res, 404, "User not found");
     }
     return successResponse(res, 200, "Profile updated successfully", updatedUser);
   } catch (error) {
-    errorResponse(res, 500, "Failed to update profile!", error);
+    return errorResponse(res, 500, "Failed to update profile!", error);
   }
 };
 
-// 🛠️ ৮. FORGOT PASSWORD (নতুন যুক্ত করা হলো)
+// ৮. FORGOT PASSWORD
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -169,40 +163,36 @@ const forgotPassword = async (req, res) => {
       return errorResponse(res, 400, "Email is required");
     }
 
-    // ডাটাবেজে ইউজার চেক করা
     const user = await User.findOne({ email });
     if (!user) {
       return errorResponse(res, 404, "User with this email does not exist");
     }
 
-    // ১ ঘণ্টার জন্য ভ্যালিড রিসেট টোকেন তৈরি
-    const resetToken = crypto.randomBytes(20).toString("hex");
+    const resetToken = crypto.randomBytes(32).toString("hex");
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600000; 
+    user.resetPasswordExpires = Date.now() + 3600000; // ১ ঘণ্টা
     await user.save();
 
-    // Nodemailer ট্রান্সপোর্টার (জিমেইলের জন্য)
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER, // .env থেকে আপনার মেইল
-        pass: process.env.EMAIL_PASS, // .env থেকে জিমেইল অ্যাপ পাসওয়ার্ড
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
-    // ফ্রন্টঅ্যান্ডের পাসওয়ার্ড রিসেট করার ইউআরএল
-    const clientUrl = process.env.CLIENT_URL || 'https://furniro-client-3e62-git-main-moznudevs-projects.vercel.app';
+    const clientUrl = process.env.CLIENT_URL || "https://furniro-client-3e62-git-main-moznudevs-projects.vercel.app";
     const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: `"Furniro Support" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: "Password Reset Request",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #dc2626; text-align: center;">পাসওয়ার্ড রিসেট রিকোয়েস্ট</h2>
+          <h2 style="color: #dc2626; text-align: center;">পাসওয়ার্ড রিসেট রিকোয়েস্ট</h2>
           <p>হ্যালো <strong>${user.username}</strong>,</p>
-          <p>আপনার অ্যাকাউন্ট থেকে পাসওয়ার্ড রিসেট করার একটি অনুরোধ এসেছে। নিচের বাটনে ক্লিক করে পাসওয়ার্ডটি রিসেট করুন:</p>
+          <p>আপনার অ্যাকাউন্ট থেকে পাসওয়ার্ড রিসেট করার অনুরোধ পাওয়া গেছে। নিচের বাটনে ক্লিক করে নতুন পাসওয়ার্ড সেট করুন:</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${resetUrl}" style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Password</a>
           </div>
@@ -211,14 +201,42 @@ const forgotPassword = async (req, res) => {
       `,
     };
 
-    // ইমেইল পাঠানো
     await transporter.sendMail(mailOptions);
-
-    return successResponse(res, 200, "পাসওয়ার্ড রিসেট লিঙ্ক সফলভাবে ইমেইলে পাঠানো হয়েছে।");
-
+    return successResponse(res, 200, "পাসওয়ার্ড রিসেট লিঙ্ক সফলভাবে ইমেইলে পাঠানো হয়েছে।");
   } catch (error) {
     console.error("Forgot password error:", error);
-    return errorResponse(res, 500, "Internal Server Error! ইমেইল পাঠানো সম্ভব হয়নি।", error);
+    return errorResponse(res, 500, "Internal Server Error! ইমেইল পাঠানো সম্ভব হয়নি।", error);
+  }
+};
+
+// ৯. RESET PASSWORD
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword) {
+      return errorResponse(res, 400, "New password is required");
+    }
+
+    // 🛠️ .select("+resetPasswordToken") যোগ করা হলো
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    }).select("+resetPasswordToken");
+
+    if (!user) {
+      return errorResponse(res, 400, "Invalid or expired reset token");
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    return successResponse(res, 200, "Password reset successful! You can now log in.");
+  } catch (error) {
+    return errorResponse(res, 500, "Failed to reset password!", error);
   }
 };
 
@@ -230,5 +248,6 @@ module.exports = {
   deleteUser,
   updateUserRole,
   editUserProfile,
-  forgotPassword, // 👈 এক্সপোর্ট লিস্টে যুক্ত করা হলো
+  forgotPassword,
+  resetPassword,
 };

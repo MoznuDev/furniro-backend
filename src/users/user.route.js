@@ -8,31 +8,27 @@ const {
   deleteUser,
   updateUserRole,
   editUserProfile,
-  forgotPassword, // 👈 ১. আপনার কন্ট্রোলার ফাইল থেকে এই ফাংশনটি ইম্পোর্ট করুন (নামটি মিলিয়ে নেবেন)
+  forgotPassword,
+  resetPassword, // 👈 ১. রিসেট পাসওয়ার্ড কন্ট্রোলারটি ইম্পোর্ট করা হলো
 } = require('./user.controller');
 const verifyToken = require('../middleware/verifyToken');
 const verifyAdmin = require('../middleware/verifyAdmin');
 
-// Register
+// Auth Routes (Public)
 router.post('/register', userRegistration);
-
-// Login
 router.post('/login', userLoggedIN);
-
-// Logout
 router.post('/logout', userLogout);
 
-// ✅ ২. Forgot Password রাউট (এখানে কোনো টোকেন ভেরিফিকেশনের প্রয়োজন নেই, কারণ ইউজার লগইন ছাড়াই এটি অ্যাক্সেস করবে)
+// Password Reset Routes (Public)
 router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword); // 👈 ২. রিসেট পাসওয়ার্ড রাউট (টোকেনসহ)
 
-// Get all users — admin only
+// Profile Routes (Protected - Logged in user only)
+router.patch('/edit-profile/:id', verifyToken, editUserProfile);
+
+// User Management Routes (Protected - Admin only)
 router.get('/users', verifyToken, verifyAdmin, getAllUsers);
-
-// আগে verifyToken, পরে verifyAdmin
 router.delete('/users/:id', verifyToken, verifyAdmin, deleteUser);
 router.put('/users/:id', verifyToken, verifyAdmin, updateUserRole);
-
-// verifyToken যোগ করা হয়েছে
-router.patch('/edit-profile/:id', verifyToken, editUserProfile);
 
 module.exports = router;
