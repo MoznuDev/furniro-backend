@@ -1,4 +1,4 @@
-const BASE_URL = "https://furniro-client-1xs7.vercel.app"
+const BASE_URL = "https://furniro-client-3e62-git-main-moznudevs-projects.vercel.app"
 
 module.exports={
     BASE_URL

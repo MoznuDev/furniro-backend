@@ -191,7 +191,7 @@ const forgotPassword = async (req, res) => {
     });
 
     // ফ্রন্টঅ্যান্ডের পাসওয়ার্ড রিসেট করার ইউআরএল
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const clientUrl = process.env.CLIENT_URL || 'https://furniro-client-3e62-git-main-moznudevs-projects.vercel.app';
     const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
 
     const mailOptions = {
