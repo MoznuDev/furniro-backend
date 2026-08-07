@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 // ১. REGISTER
-const userRegistration = async (req, res, next) => {
+const userRegistration = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -16,8 +16,12 @@ const userRegistration = async (req, res, next) => {
     const cleanEmail = email.toLowerCase().trim();
     const cleanUsername = username.trim();
 
+    // 🛠️ Case-insensitive ভাবে username এবং email চেক
     const existingUser = await User.findOne({
-      $or: [{ email: cleanEmail }, { username: cleanUsername }],
+      $or: [
+        { email: cleanEmail },
+        { username: { $regex: new RegExp(`^${cleanUsername}$`, "i") } }
+      ],
     });
 
     if (existingUser) {
@@ -29,10 +33,11 @@ const userRegistration = async (req, res, next) => {
       }
     }
 
+    // নতুন ইউজার তৈরি
     const user = new User({
       username: cleanUsername,
       email: cleanEmail,
-      password,
+      password, // নিশ্চিত করুন user.model.js-এ pre('save') দিয়ে bcrypt hash করা আছে
     });
 
     await user.save();
@@ -40,11 +45,13 @@ const userRegistration = async (req, res, next) => {
   } catch (error) {
     console.error("Registration Error Details:", error);
 
+    // Mongoose Validation Error
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((val) => val.message);
       return errorResponse(res, 400, messages.join(", "), error.message);
     }
 
+    // Duplicate Index Error (MongoDB Code 11000)
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return errorResponse(res, 400, `This ${field} is already in use`);
@@ -58,7 +65,6 @@ const userRegistration = async (req, res, next) => {
     );
   }
 };
-
 // ২. LOGIN
 const userLoggedIN = async (req, res) => {
   try {
