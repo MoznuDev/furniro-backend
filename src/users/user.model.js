@@ -71,17 +71,9 @@ const userSchema = new mongoose.Schema(
 );
 
 // HASH PASSWORD (সেভ বা পাসওয়ার্ড মডিফাই করার আগে হ্যাশ করা)
-userSchema.pre("save", async function (next) {
-  // পাসওয়ার্ড চেঞ্জ বা নতুন তৈরি না হলে হ্যাশ হবে না
-  if (!this.isModified("password")) return next();
-
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 // COMPARE PASSWORD (লগইনের সময় পাসওয়ার্ড মেলানো)
