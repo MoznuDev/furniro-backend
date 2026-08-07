@@ -67,10 +67,10 @@ async function connectDB() {
 }
 
 // সব Route-এর আগে DB Connection Check
-app.use(async (req, res) => {
+app.use(async (req, res, next) => {
   try {
     await connectDB();
-  
+    next();
   } catch (err) {
     console.error("Database middleware error:", err);
     res.status(500).json({ success: false, message: "Database Connection Error" });

@@ -6,7 +6,6 @@ const nodemailer = require("nodemailer");
 
 // ১. REGISTER
 const userRegistration = async (req, res, next) => {
- 
   try {
     const { username, email, password } = req.body;
 
@@ -17,12 +16,8 @@ const userRegistration = async (req, res, next) => {
     const cleanEmail = email.toLowerCase().trim();
     const cleanUsername = username.trim();
 
-    // 🛠️ ইমেইল অথবা ইউজারনেম আগে থেকে থাকলে ব্যাকএন্ড থেকেই ব্লক করবে
     const existingUser = await User.findOne({
-      $or: [
-        { email: cleanEmail },
-        { username: cleanUsername },
-      ],
+      $or: [{ email: cleanEmail }, { username: cleanUsername }],
     });
 
     if (existingUser) {
@@ -34,7 +29,6 @@ const userRegistration = async (req, res, next) => {
       }
     }
 
-    // নতুন ইউজার তৈরি
     const user = new User({
       username: cleanUsername,
       email: cleanEmail,
@@ -42,18 +36,15 @@ const userRegistration = async (req, res, next) => {
     });
 
     await user.save();
-
     return successResponse(res, 201, "User registered successfully!");
   } catch (error) {
     console.error("Registration Error Details:", error);
-    next(error);
-    // Mongoose Validation Error (যেমন পাসওয়ারড লেন্থ ছোট হওয়া)
+
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((val) => val.message);
       return errorResponse(res, 400, messages.join(", "), error.message);
     }
 
-    // Duplicate Index Error (MongoDB Code 11000)
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return errorResponse(res, 400, `This ${field} is already in use`);
