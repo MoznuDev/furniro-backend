@@ -5,12 +5,10 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 // ১. REGISTER
-const userRegistration = async (req, res) => {
+const userRegistration = async (req, res, next) => {
  
   try {
     const { username, email, password } = req.body;
- console.log("===== REGISTER API =====");
-  console.log(req.body);
 
     if (!username || !email || !password) {
       return errorResponse(res, 400, "All fields are required");
@@ -48,8 +46,8 @@ const userRegistration = async (req, res) => {
     return successResponse(res, 201, "User registered successfully!");
   } catch (error) {
     console.error("Registration Error Details:", error);
-    
-    // Mongoose Validation Error (যেমন পাসওয়ার্ড লেন্থ ছোট হওয়া)
+    next(error);
+    // Mongoose Validation Error (যেমন পাসওয়ারড লেন্থ ছোট হওয়া)
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((val) => val.message);
       return errorResponse(res, 400, messages.join(", "), error.message);
