@@ -170,7 +170,7 @@ const updateUserRole = async (req, res) => {
     }
     return successResponse(res, 200, "User role updated successfully", updatedUser);
   } catch (error) {
-    return errorResponse(res, 500, "Failed to update user role!", error.message || String(error));
+    return errorResponse(res, 500, "Failed to update user role!", error);
   }
 };
 
