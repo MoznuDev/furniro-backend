@@ -46,7 +46,7 @@ const userRegistration = async (req, res, next) => {
     return successResponse(res, 201, "User registered successfully!");
   } catch (error) {
     console.error("Registration Error Details:", error);
-    next(error);
+  
     // Mongoose Validation Error (যেমন পাসওয়ারড লেন্থ ছোট হওয়া)
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((val) => val.message);
