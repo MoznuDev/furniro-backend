@@ -29,19 +29,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
-      select: false, // বাই-ডিফল্ট কুয়েরিতে পাসওয়ার্ড আসবে না
+      select: false, // বাই-ডিফল্ট কুয়েরিতে পাসওয়ার্ড আসবে না
     },
 
-    bio: { 
-      type: String, 
+    bio: {
+      type: String,
       maxlength: [200, "Bio cannot exceed 200 characters"],
-      default: "" 
+      default: "",
     },
-    
-    profession: { 
-      type: String, 
+
+    profession: {
+      type: String,
       maxlength: [100, "Profession cannot exceed 100 characters"],
-      default: "" 
+      default: "",
     },
 
     role: {
@@ -55,10 +55,9 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
-    // 🛠️ পাসওয়ার্ড রিসেটের জন্য ফিল্ড
+    // 🛠️ পাসওয়ার্ড রিসেটের ফিল্ড (কন্ট্রোলারের সাথে সামঞ্জস্য রেখে সংশোধন)
     resetPasswordToken: {
       type: String,
-      select: false, // নিরাপত্তার জন্য সাধারণ ফাইন্ড কুয়েরিতে আসবে না
       default: null,
     },
     resetPasswordExpires: {
@@ -71,10 +70,11 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// HASH PASSWORD (সেভ করার আগে পাসওয়ার্ড হ্যাশ করা)
+// HASH PASSWORD (সেভ বা পাসওয়ার্ড মডিফাই করার আগে হ্যাশ করা)
 userSchema.pre("save", async function (next) {
+  // পাসওয়ার্ড চেঞ্জ বা নতুন তৈরি না হলে হ্যাশ হবে না
   if (!this.isModified("password")) return next();
-  
+
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);

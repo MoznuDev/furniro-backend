@@ -6,24 +6,67 @@ const nodemailer = require("nodemailer");
 
 // ১. REGISTER
 const userRegistration = async (req, res) => {
+ 
   try {
     const { username, email, password } = req.body;
+ console.log("===== REGISTER API =====");
+  console.log(req.body);
 
     if (!username || !email || !password) {
       return errorResponse(res, 400, "All fields are required");
     }
 
-    const existingUser = await User.findOne({ email });
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanUsername = username.trim();
+
+    // 🛠️ ইমেইল অথবা ইউজারনেম আগে থেকে থাকলে ব্যাকএন্ড থেকেই ব্লক করবে
+    const existingUser = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        { username: cleanUsername },
+      ],
+    });
+
     if (existingUser) {
-      return errorResponse(res, 400, "User already exists");
+      if (existingUser.email === cleanEmail) {
+        return errorResponse(res, 400, "Email is already registered");
+      }
+      if (existingUser.username.toLowerCase() === cleanUsername.toLowerCase()) {
+        return errorResponse(res, 400, "Username is already taken");
+      }
     }
 
-    const user = new User({ username, email, password });
+    // নতুন ইউজার তৈরি
+    const user = new User({
+      username: cleanUsername,
+      email: cleanEmail,
+      password,
+    });
+
     await user.save();
 
     return successResponse(res, 201, "User registered successfully!");
   } catch (error) {
-    return errorResponse(res, 500, "Registration failed!", error);
+    console.error("Registration Error Details:", error);
+    
+    // Mongoose Validation Error (যেমন পাসওয়ার্ড লেন্থ ছোট হওয়া)
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((val) => val.message);
+      return errorResponse(res, 400, messages.join(", "), error.message);
+    }
+
+    // Duplicate Index Error (MongoDB Code 11000)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return errorResponse(res, 400, `This ${field} is already in use`);
+    }
+
+    return errorResponse(
+      res,
+      500,
+      "Registration failed!",
+      error.message || String(error)
+    );
   }
 };
 
@@ -36,7 +79,7 @@ const userLoggedIN = async (req, res) => {
       return errorResponse(res, 400, "All fields are required");
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select("+password");
     if (!user) {
       return errorResponse(res, 404, "User not found");
     }
@@ -47,9 +90,9 @@ const userLoggedIN = async (req, res) => {
     }
 
     const token = generateToken({
-  userId: user._id,
-  role: user.role,
-});
+      userId: user._id,
+      role: user.role,
+    });
 
     const isProduction = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
@@ -72,7 +115,7 @@ const userLoggedIN = async (req, res) => {
       },
     });
   } catch (error) {
-    return errorResponse(res, 500, "Login failed!", error);
+    return errorResponse(res, 500, "Login failed!", error.message || String(error));
   }
 };
 
@@ -87,7 +130,7 @@ const userLogout = async (req, res) => {
     });
     return successResponse(res, 200, "Logged out successfully");
   } catch (error) {
-    return errorResponse(res, 500, "Logout failed", error);
+    return errorResponse(res, 500, "Logout failed", error.message || String(error));
   }
 };
 
@@ -97,7 +140,7 @@ const getAllUsers = async (req, res) => {
     const users = await User.find({}, "email role username profileImage createdAt").sort({ createdAt: -1 });
     return successResponse(res, 200, "All users fetched successfully", users);
   } catch (error) {
-    return errorResponse(res, 500, "Failed to fetch all users!", error);
+    return errorResponse(res, 500, "Failed to fetch all users!", error.message || String(error));
   }
 };
 
@@ -111,7 +154,7 @@ const deleteUser = async (req, res) => {
     }
     return successResponse(res, 200, "User deleted successfully");
   } catch (error) {
-    return errorResponse(res, 500, "Failed to delete user!", error);
+    return errorResponse(res, 500, "Failed to delete user!", error.message || String(error));
   }
 };
 
@@ -132,7 +175,7 @@ const updateUserRole = async (req, res) => {
     }
     return successResponse(res, 200, "User role updated successfully", updatedUser);
   } catch (error) {
-    return errorResponse(res, 500, "Failed to update user role!", error);
+    return errorResponse(res, 500, "Failed to update user role!", error.message || String(error));
   }
 };
 
@@ -153,7 +196,7 @@ const editUserProfile = async (req, res) => {
     }
     return successResponse(res, 200, "Profile updated successfully", updatedUser);
   } catch (error) {
-    return errorResponse(res, 500, "Failed to update profile!", error);
+    return errorResponse(res, 500, "Failed to update profile!", error.message || String(error));
   }
 };
 
@@ -166,7 +209,7 @@ const forgotPassword = async (req, res) => {
       return errorResponse(res, 400, "Email is required");
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
       return errorResponse(res, 404, "User with this email does not exist");
     }
@@ -208,7 +251,7 @@ const forgotPassword = async (req, res) => {
     return successResponse(res, 200, "পাসওয়ার্ড রিসেট লিঙ্ক সফলভাবে ইমেইলে পাঠানো হয়েছে।");
   } catch (error) {
     console.error("Forgot password error:", error);
-    return errorResponse(res, 500, "Internal Server Error! ইমেইল পাঠানো সম্ভব হয়নি।", error);
+    return errorResponse(res, 500, "Internal Server Error! ইমেইল পাঠানো সম্ভব হয়নি।", error.message || String(error));
   }
 };
 
@@ -222,11 +265,10 @@ const resetPassword = async (req, res) => {
       return errorResponse(res, 400, "New password is required");
     }
 
-    // 🛠️ .select("+resetPasswordToken") যোগ করা হলো
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: Date.now() },
-    }).select("+resetPasswordToken");
+    });
 
     if (!user) {
       return errorResponse(res, 400, "Invalid or expired reset token");
@@ -239,7 +281,7 @@ const resetPassword = async (req, res) => {
 
     return successResponse(res, 200, "Password reset successful! You can now log in.");
   } catch (error) {
-    return errorResponse(res, 500, "Failed to reset password!", error);
+    return errorResponse(res, 500, "Failed to reset password!", error.message || String(error));
   }
 };
 

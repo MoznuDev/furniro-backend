@@ -1,21 +1,36 @@
-const successResponse = (res, statusCode, message, data = {}) => {
-  res.status(statusCode).json({
+const successResponse = (
+  res,
+  statusCode = 200,
+  message = "Success",
+  data = {}
+) => {
+  return res.status(statusCode).json({
     success: true,
     message,
     data,
   });
 };
 
-const errorResponse = (res, statusCode, message, error = null) => {
-  // Server এ পুরো error log করো
-  console.error("Error:", error?.stack || error);
+const errorResponse = (
+  res,
+  statusCode = 500,
+  message = "Error occurred",
+  error = null
+) => {
 
-  res.status(statusCode).json({
+  console.log("Received Error:", error);
+
+  return res.status(statusCode).json({
     success: false,
     message,
-    //  Production এ error details hide করো
-    error: process.env.NODE_ENV === "development" ? error?.message : null,
+    error:
+      typeof error === "string"
+        ? error
+        : error?.message || null,
   });
 };
 
-module.exports = { successResponse, errorResponse };
+module.exports = {
+  successResponse,
+  errorResponse,
+};
