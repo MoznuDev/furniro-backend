@@ -9,7 +9,7 @@ const {
   updateUserRole,
   editUserProfile,
   forgotPassword,
-  resetPassword, // 👈 ১. রিসেট পাসওয়ার্ড কন্ট্রোলারটি ইম্পোর্ট করা হলো
+  resetPassword, 
 } = require('./user.controller');
 const verifyToken = require('../middleware/verifyToken');
 const verifyAdmin = require('../middleware/verifyAdmin');
@@ -21,7 +21,7 @@ router.post('/logout', userLogout);
 
 // Password Reset Routes (Public)
 router.post('/forgot-password', forgotPassword);
-router.post('/reset-password/:token', resetPassword); // 👈 ২. রিসেট পাসওয়ার্ড রাউট (টোকেনসহ)
+router.post('/reset-password/:token', resetPassword); 
 
 // Profile Routes (Protected - Logged in user only)
 router.patch('/edit-profile/:id', verifyToken, editUserProfile);
